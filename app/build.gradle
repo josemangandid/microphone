@@ -1,0 +1,95 @@
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.jetbrains.kotlin.android)
+}
+
+android {
+    namespace 'com.skz.microphone'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.skz.microphone"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("${projectDir}/mic.jks")
+            storePassword 'Password!23'
+            keyAlias 'mic'
+            keyPassword 'Password!23'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+        debug {
+            debuggable true
+            signingConfig signingConfigs.release
+
+        }
+    }
+
+    flavorDimensions "environment"
+    productFlavors {
+        production {
+            dimension "environment"
+            versionCode 1
+            versionName "1.0.0"
+            manifestPlaceholders = [appLabel: "MIC"]
+
+
+        }
+        development {
+            dimension "environment"
+            versionCode 1
+            versionName "1.0.0"
+            manifestPlaceholders = [appLabel: "MIC Dev"]
+            applicationIdSuffix ".dev"
+        }
+    }
+
+
+    applicationVariants.configureEach { variant ->
+        def flavorName = variant.flavorName == "development" ? "DEV" : "PROD"
+        def versionName = variant.versionName
+        def apkName = ""
+
+        apkName = "MIC_${flavorName}_${versionName}.apk"
+
+        variant.outputs.configureEach { output ->
+            outputFileName = apkName
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.appcompat
+    implementation libs.material
+    implementation libs.androidx.activity
+    implementation libs.androidx.constraintlayout
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
+    androidTestImplementation libs.androidx.espresso.core
+}
