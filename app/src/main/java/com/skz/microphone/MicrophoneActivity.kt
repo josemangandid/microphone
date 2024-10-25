@@ -9,9 +9,14 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.AdapterView
 import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.RelativeLayout
+import android.widget.Spinner
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -19,6 +24,10 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.mediarouter.media.MediaControlIntent
+import androidx.mediarouter.media.MediaRouteSelector
+import androidx.mediarouter.media.MediaRouter
+import androidx.mediarouter.media.MediaRouter.RouteInfo
 
 
 class MicrophoneActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener,
@@ -35,7 +44,8 @@ class MicrophoneActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private var permissionToRecordAccepted = false
     private var permissions: Array<String> = arrayOf(Manifest.permission.RECORD_AUDIO)
-
+    private lateinit var mediaRouter: MediaRouter
+    private lateinit var audioRouteAdapter: AudioRouteAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +56,15 @@ class MicrophoneActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        mediaRouter = MediaRouter.getInstance(this)
+        val selector = MediaRouteSelector.Builder()
+            .addControlCategory(MediaControlIntent.CATEGORY_LIVE_AUDIO)
+            .build()
+        mediaRouter.addCallback(selector, mediaRouterCallback)
+
 
         Log.d(APP_TAG, "Opening mic activity");
         this.sharedPreferences = getSharedPreferences(APP_TAG, MODE_PRIVATE);
@@ -54,15 +72,76 @@ class MicrophoneActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         this.sharedPreferences = getSharedPreferences(APP_TAG, MODE_PRIVATE);
         this.sharedPreferences.registerOnSharedPreferenceChangeListener(this);
         this.isActive = this.sharedPreferences.getBoolean("active", false);
+
+        val parentLayout: RelativeLayout = findViewById(R.id.main)
+        val spinnerAudioDevices: Spinner = findViewById(R.id.spinnerAudioDevices)
+
+        parentLayout.post {
+            val parentWidth = parentLayout.width
+            val spinnerWidth = (parentWidth * 0.7).toInt()
+            val layoutParams = LinearLayout.LayoutParams(spinnerWidth, LinearLayout.LayoutParams.WRAP_CONTENT)
+            layoutParams.gravity = Gravity.CENTER_HORIZONTAL
+            spinnerAudioDevices.layoutParams = layoutParams
+        }
+
+        audioRouteAdapter = AudioRouteAdapter(this, getAudioRoutes())
+        spinnerAudioDevices.adapter = audioRouteAdapter
+
+        spinnerAudioDevices.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                val selectedRoute = parent.getItemAtPosition(position) as RouteInfo
+                changeAudioRoute(selectedRoute)
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {
+                // No hacer nada
+            }
+        }
+
+
+
         if (this.isActive) {
             checkAudioPermission()
         }
-
 
         val recordButton = findViewById<ImageButton>(R.id.record_button)
         recordButton.setOnClickListener(this)
         recordButton.setImageBitmap(BitmapFactory.decodeResource(resources, if (this.isActive) R.drawable.ic_mic_off else R.drawable.ic_mic))
 
+    }
+
+    private val mediaRouterCallback = object : MediaRouter.Callback() {
+        override fun onRouteAdded(router: MediaRouter?, route: RouteInfo?) {
+            super.onRouteAdded(router, route)
+            updateAudioRoutes()
+        }
+
+        override fun onRouteRemoved(router: MediaRouter?, route: RouteInfo?) {
+            super.onRouteRemoved(router, route)
+            updateAudioRoutes()
+        }
+
+        override fun onRouteChanged(router: MediaRouter?, route: RouteInfo?) {
+            super.onRouteChanged(router, route)
+            updateAudioRoutes()
+        }
+    }
+
+    private fun updateAudioRoutes() {
+        val audioDevices = getAudioRoutes()
+        audioRouteAdapter.updateRoutes(audioDevices)
+    }
+
+
+    private fun changeAudioRoute(route: RouteInfo) {
+        mediaRouter.selectRoute(route)
+    }
+
+    private fun getAudioRoutes(): List<RouteInfo> {
+        return mediaRouter.routes.filter { route ->
+            route.supportsControlCategory(MediaControlIntent.CATEGORY_LIVE_AUDIO) ||
+                    route.supportsControlCategory(MediaControlIntent.CATEGORY_LIVE_VIDEO)
+        }
     }
 
     private var attemptCount = 0
@@ -92,8 +171,6 @@ class MicrophoneActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             }
         }
     }
-
-
 
     override fun onStop() {
         super.onStop()

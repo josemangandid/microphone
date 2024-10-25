@@ -3,4 +3,5 @@
     <string name="mic_active">Microphone is active</string>
     <string name="cancel_mic">Click to cancel</string>
     <string name="on_off_mic">On / Off MIC</string>
+    <string name="select_an_audio_device">Selecciona un dispositivo de audio</string>
 </resources>
